@@ -1,4 +1,13 @@
+# Terraform
 .terraform/
+
+# Segredos e Ambientes
 .env
 venv/
+build/
+
+# Python
 __pycache__/
+
+# Pacotes da Lambda
+*.zip
