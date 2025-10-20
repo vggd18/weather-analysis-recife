@@ -8,8 +8,8 @@ from datetime import datetime
 def lambda_handler(event, context):
   ##### ENVIRONMENT VARIABLES #####
   load_dotenv()
-  s3_bucket_name = os.getenv("S3-BUCKET-NAME")
-  weather_api_key = os.getenv("WEATHER-API-KEY") 
+  s3_bucket_name = os.getenv("S3_BUCKET_NAME")
+  weather_api_key = os.getenv("WEATHER_API_KEY") 
 
   ##### WEATHER API REQUEST #####
   city = "Recife,BR"

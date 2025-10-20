@@ -62,6 +62,11 @@ data "archive_file" "lambda_zip" {
   output_path = "lambda_function_payload.zip"
 }
 
+variable "weather_api_key" {
+  type      = string
+  sensitive = true
+}
+
 resource "aws_lambda_function" "weather_ingestion_lambda" {
   function_name     = "weather_ingestion_recife"
   role              = aws_iam_role.lambda_execution_role.arn
@@ -69,5 +74,12 @@ resource "aws_lambda_function" "weather_ingestion_lambda" {
   runtime           = "python3.9"
   filename          = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-}
+  timeout           = 30
 
+  environment {
+    variables = {
+      S3_BUCKET_NAME = aws_s3_bucket.data_lake.bucket
+      WEATHER_API_KEY = var.weather_api_key
+    }
+  }
+}
