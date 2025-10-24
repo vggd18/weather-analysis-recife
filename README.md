@@ -7,10 +7,10 @@ Construir um data lakehouse confiável e automatizado que armazena dados histór
 ## 🏛️ Arquitetura
 
 O pipeline de dados funciona da seguinte maneira:
-1.  Uma função **AWS Lambda** é invocada periodicamente.
-2.  A função busca os dados de clima atuais da API do **OpenWeatherMap**.
-3.  Os dados são salvos como um arquivo JSON em um bucket no **Amazon S3**, particionados por `ano/mês/dia`.
-4.  Toda a infraestrutura (S3, IAM, Lambda) é provisionada via **Terraform**.
+1.  Um **Amazon EventBridge Scheduler** é disparado a cada 15 minutos, invocando uma função **AWS Lambda**.
+2.  A função **Lambda** busca os dados de clima atuais da API do **OpenWeatherMap**.
+3.  Os dados são salvos como um arquivo JSON em um bucket no **Amazon S3** (Camada Raw), particionados por `ano/mês/dia`.
+4.  Toda a infraestrutura (S3, IAM, Lambda, EventBridge) é provisionada via **Terraform**.
 
 ## ⚙️ Tecnologias Utilizadas
 
