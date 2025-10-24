@@ -108,7 +108,7 @@ resource "aws_iam_policy" "event_bridge_policy" {
       {      
         "Effect": "Allow",
         "Action": ["lambda:InvokeFunction"],
-        "Resource": ["${aws_lambda_function.weather_ingestion_lambda.arn}/*"]
+        "Resource": [aws_lambda_function.weather_ingestion_lambda.arn]
       }
     ]
   })
