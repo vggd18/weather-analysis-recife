@@ -83,3 +83,51 @@ resource "aws_lambda_function" "weather_ingestion_lambda" {
     }
   }
 }
+
+resource "aws_iam_role" "event_bridge_role" {
+   assume_role_policy = jsonencode({
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "sts:AssumeRole",
+        "Principal": {
+          "Service": "scheduler.amazonaws.com"
+        },
+        "Effect": "Allow",
+        "Sid": ""
+      }
+    ]
+  })
+
+}
+resource "aws_iam_policy" "event_bridge_policy" {
+  name    = "scheduler_lambda_invoke_policy"
+  policy  = jsonencode({
+    "Version": "2012-10-17",
+    "Statement" = [
+      {      
+        "Effect": "Allow",
+        "Action": ["lambda:InvokeFunction"],
+        "Resource": ["${aws_lambda_function.weather_ingestion_lambda.arn}/*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "event_bridge_policy_attachment" {
+  role       = aws_iam_role.event_bridge_role.name
+  policy_arn = aws_iam_policy.event_bridge_policy.arn
+}
+
+resource "aws_scheduler_schedule" "weather_data_schedule" {
+  name = "trigger_weather_lambda"
+  flexible_time_window {
+    mode = "OFF"
+  }
+  schedule_expression = "rate(15 minute)"
+  target {
+    arn      = aws_lambda_function.weather_ingestion_lambda.arn
+    role_arn = aws_iam_role.event_bridge_role.arn
+  }
+
+}
