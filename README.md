@@ -10,12 +10,13 @@ O pipeline de dados funciona da seguinte maneira:
 1.  Um **Amazon EventBridge Scheduler** é disparado a cada 15 minutos, invocando uma função **AWS Lambda**.
 2.  A função **Lambda** busca os dados de clima atuais da API do **OpenWeatherMap**.
 3.  Os dados são salvos como um arquivo JSON em um bucket no **Amazon S3** (Camada Raw), particionados por `ano/mês/dia`.
-4.  Toda a infraestrutura (S3, IAM, Lambda, EventBridge) é provisionada via **Terraform**.
+4.  Um **AWS Glue Job** (provisionado via Terraform) está configurado para ler os dados da camada Raw, aplicar transformações (ainda a serem desenvolvidas) e salvar na camada Processed.
+5.  Toda a infraestrutura (S3, IAM, Lambda, EventBridge, Glue) é provisionada via **Terraform**.
 
 ## ⚙️ Tecnologias Utilizadas
 
-* **Nuvem:** AWS (S3, Lambda, IAM, EventBridge)
-* **IaC:** Terraform
+* **Nuvem:** AWS (S3, Lambda, IAM, EventBridge, Glue)
+* * **IaC:** Terraform
 * **Linguagem:** Python 3.9
 * **Fonte de Dados:** OpenWeatherMap API
 
