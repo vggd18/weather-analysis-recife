@@ -27,7 +27,7 @@ def lambda_handler(event, context):
   json_data = json.dumps(data, indent=2)
 
   now = datetime.now()
-  file_key = now.strftime("%Y/%m/%d/%H-%M-%S.json") 
+  file_key = f'raw/weather/{now.strftime("%Y/%m/%d/%H-%M-%S.json")}' 
 
   s3 = boto3.client('s3')
   s3.put_object(
