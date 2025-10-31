@@ -45,8 +45,8 @@ resource "aws_iam_policy" "lambda_policy" {
         "Resource" = "arn:aws:logs:*:*:*"
       },
       {      
-        "Effect" = "Allow",
-        "Action" = ["s3:PutObject"],
+        "Effect"   = "Allow",
+        "Action"   = ["s3:PutObject"],
         "Resource" = ["${aws_s3_bucket.data_lake.arn}/*"]
       }
     ]
@@ -238,5 +238,97 @@ resource "aws_glue_trigger" "weather_job_trigger" {
 
   actions {
     job_name = aws_glue_job.weather_job.name
+  }
+}
+
+##### Glue Crawler #####
+resource "aws_iam_role" "glue_crawler_role" {
+  name = "weather_glue_crawler_role"
+  assume_role_policy = jsonencode({
+    "Version" = "2012-10-17",
+    "Statement" = [
+      {
+        "Action" = "sts:AssumeRole",
+        "Principal" = {
+          "Service" = "glue.amazonaws.com"
+        },
+        "Effect" = "Allow",
+        "Sid" = ""
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "glue_crawler_policy" {
+  name   = "weather_glue_crawler_policy"
+  policy = jsonencode({
+    "Version" = "2012-10-17",
+    "Statement" = [
+      {
+        "Effect"   = "Allow",
+        "Action"   = "s3:ListBucket", 
+        "Resource" = aws_s3_bucket.data_lake.arn
+      }, 
+      {
+        "Effect" = "Allow",
+        "Action" = [
+          "s3:GetObject",
+        ],
+        "Resource" = ["${aws_s3_bucket.data_lake.arn}/*"]
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          # Permissões para gerenciar o Banco de Dados
+          "glue:CreateDatabase",
+          "glue:GetDatabase",
+          "glue:GetDatabases",
+          "glue:UpdateDatabase",
+          "glue:DeleteDatabase",
+          
+          # Permissões para gerenciar a Tabela
+          "glue:CreateTable",
+          "glue:UpdateTable",
+          "glue:GetTable",
+          "glue:GetTables",
+          "glue:DeleteTable",
+          
+          # Permissões para gerenciar as Partições
+          "glue:BatchGetPartition",
+          "glue:GetPartition",
+          "glue:GetPartitions",
+          "glue:CreatePartition",
+          "glue:UpdatePartition",
+          "glue:DeletePartition",
+          "glue:BatchCreatePartition",
+          "glue:BatchDeletePartition"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Effect" = "Allow",
+        "Action" = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource" = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "glue_crawler_policy_attachment" {
+  role       = aws_iam_role.glue_crawler_role.name
+  policy_arn = aws_iam_policy.glue_crawler_policy.arn
+}
+
+resource "aws_glue_crawler" "weather_crawler" {
+  database_name = "weather_data_db"
+  schedule      = "cron(0 1 * * ? *)"
+  name          = "weather_data_crawler"
+  role          = aws_iam_role.glue_crawler_role.arn
+  s3_target {
+    path = "s3://${aws_s3_bucket.data_lake.bucket}/curated/weather/"
   }
 }
