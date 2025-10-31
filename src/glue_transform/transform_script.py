@@ -4,7 +4,7 @@ from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
 from awsglue.job import Job  
 from pyspark.context import SparkContext
-from pyspark.sql.functions import col, explode
+from pyspark.sql.functions import col, explode, from_unixtime, when, isnull, count
 
 args_list = ['JOB_NAME', 'S3_BUCKET_NAME']
 args = getResolvedOptions(sys.argv, args_list)
@@ -74,13 +74,50 @@ transformed_df = exploded_df.select(
     col("base")
 )
 
+transformed_df = transformed_df.dropDuplicates(['id', 'dt'])
+
+transformed_df = transformed_df \
+    .withColumn("year", from_unixtime(col('dt'), format="yyyy")) \
+    .withColumn("month", from_unixtime(col('dt'), format="MM")) \
+    .withColumn("day", from_unixtime(col('dt'), format="dd"))
+
+print("Calculando contagem total de linhas...")
+total_count = transformed_df.count()
+print(f"Total de linhas: {total_count}")
+
+null_check_expressions = []
+for c_name in transformed_df.columns:
+    null_count_expr = count(when(isnull(col(c_name)), 1)).alias(c_name)
+    null_check_expressions.append(null_count_expr)
+
+print("Calculando contagem de nulos para todas as colunas (1 Ação)...")
+null_counts_row = transformed_df.select(null_check_expressions).collect()[0]
+
+threshold = 0.7
+cols_to_drop = []
+
+print(f"Verificando colunas com mais de {threshold*100}% de nulos...")
+for c_name in transformed_df.columns:
+    null_count = null_counts_row[c_name] 
+    
+    if total_count > 0:
+        null_rate = (null_count / total_count)
+        
+        if null_rate > threshold:
+            print(f"REMOVENDO: {c_name} (Taxa de nulos: {null_rate*100:.2f}%)")
+            cols_to_drop.append(c_name)
+
+transformed_df = transformed_df.drop(*cols_to_drop)
 print("Transformação concluída. Schema final:")
-transformed_df.printSchema()
 
 print(f"Escrevendo DataFrame transformado em Parquet para: {output_path}")
-transformed_df.write.format("parquet").mode("overwrite").save(output_path)
+transformed_df.write \
+    .format("parquet") \
+    .mode("overwrite") \
+    .partitionBy("year", "month", "day") \
+    .save(output_path)
+    
 print("Escrita concluída.")
 
-# --- 6. Finalização (Salva o Bookmark) ---
 print("Job concluído. Salvando bookmarks.")
 job.commit()

@@ -175,7 +175,8 @@ resource "aws_iam_policy" "glue_policy" {
         "Effect" = "Allow",
         "Action" = [
           "s3:GetObject",
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:DeleteObject"
         ],
         "Resource" = ["${aws_s3_bucket.data_lake.arn}/*"]
       }, 
@@ -227,5 +228,15 @@ resource "aws_glue_job" "weather_job" {
   }
   default_arguments = {
     "--S3_BUCKET_NAME" = aws_s3_bucket.data_lake.bucket  
+  }
+}
+
+resource "aws_glue_trigger" "weather_job_trigger" {
+  name     = "weather_job_trigger"
+  type     = "SCHEDULED"
+  schedule = "cron(0 0 * * ? *)"
+
+  actions {
+    job_name = aws_glue_job.weather_job.name
   }
 }
