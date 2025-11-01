@@ -332,3 +332,86 @@ resource "aws_glue_crawler" "weather_crawler" {
     path = "s3://${aws_s3_bucket.data_lake.bucket}/curated/weather/"
   }
 }
+
+##### Athena Config #####
+resource "aws_athena_workgroup" "weather_athena_workgroup" {
+  name = "weather_athena_workgroup"
+  configuration {
+    enforce_workgroup_configuration    = true
+    publish_cloudwatch_metrics_enabled = true
+    result_configuration {
+      output_location = "s3://${aws_s3_bucket.data_lake.bucket}/athena/results/"
+    }
+  }
+}
+
+
+resource "aws_athena_named_query" "daily_summary" {
+  name      = "daily_weather_summary"
+  workgroup = aws_athena_workgroup.weather_athena_workgroup.name
+  database  = aws_glue_crawler.weather_crawler.database_name
+  query     = <<-EOF
+    SELECT
+      "year",
+      "month",
+      "day",
+      CAST(CONCAT("year", '-', "month", '-', "day") AS date) AS "report_date",
+      ROUND(AVG(main_temp), 2) AS "avg_temp_celsius",
+      ROUND(MAX(main_temp_max), 2) AS "max_temp_celsius",
+      ROUND(MIN(main_temp_min), 2) AS "min_temp_celsius",
+      ROUND(AVG(main_feels_like), 2) AS "avg_feels_like",      
+      ROUND(AVG(main_humidity), 1) AS "avg_humidity_percent",
+      ROUND(MAX(wind_speed), 1) AS "max_wind_speed_ms",
+      ROUND(AVG(clouds_all), 1) AS "avg_cloudiness_percent"  
+    FROM weather
+    GROUP BY "year", "month", "day"
+    ORDER BY "year", "month", "day" DESC;
+  EOF
+}
+
+resource "aws_athena_named_query" "day_vs_night_comparison" {
+  name      = "day_vs_night_metrics"
+  workgroup = aws_athena_workgroup.weather_athena_workgroup.name
+  database  = aws_glue_crawler.weather_crawler.database_name
+  query     = <<-EOF
+    WITH classified_readings AS (
+      SELECT
+        *,
+        CASE 
+          WHEN dt > sys_sunrise_utc AND dt < sys_sunset_utc THEN 'Dia'
+          ELSE 'Noite'
+        END AS "period_of_day"
+      FROM weather
+    )
+    SELECT
+      period_of_day,
+      COUNT(*) AS "reading_count",
+      ROUND(AVG(main_temp), 2) AS "avg_temp",
+      ROUND(AVG(main_humidity), 1) AS "avg_humidity",
+      ROUND(AVG(wind_speed), 1) AS "avg_wind_speed"
+    FROM classified_readings
+    GROUP BY period_of_day;
+  EOF
+}
+
+resource "aws_athena_named_query" "hourly_temp_delta" {
+  name      = "hourly_temperature_delta"
+  workgroup = aws_athena_workgroup.weather_athena_workgroup.name
+  database  = aws_glue_crawler.weather_crawler.database_name
+  query     = <<-EOF
+    WITH hourly_avg AS (
+      SELECT
+        date_trunc('hour', from_unixtime(dt)) AS "hour_timestamp",            
+        ROUND(AVG(main_temp), 2) AS "avg_hourly_temp"
+      FROM weather
+      GROUP BY 1
+    )
+    SELECT
+      hour_timestamp,
+      avg_hourly_temp,
+      LAG(avg_hourly_temp, 1) OVER (ORDER BY hour_timestamp) AS "previous_hour_temp",        
+      ROUND(avg_hourly_temp - (LAG(avg_hourly_temp, 1) OVER (ORDER BY hour_timestamp)), 2) AS "hourly_temp_change_delta"    
+    FROM hourly_avg
+    ORDER BY hour_timestamp DESC;
+  EOF
+}
